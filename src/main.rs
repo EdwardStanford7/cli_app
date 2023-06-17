@@ -50,6 +50,7 @@ fn main() {
     let mut current_dir = current_dir().unwrap();
     let mut input = String::new();
     let stdin = io::stdin();
+    let mut show_hidden = false;
 
     loop {
         print!("{}> ", current_dir.to_string_lossy());
@@ -64,10 +65,27 @@ fn main() {
 
         if let Some(first) = command {
             match first {
-                "find" => find(FindArgs::parse_from(parts)),
-                "cd" => current_dir = cd(current_dir, parts.next()).clone(),
-                "ls" => ls(&current_dir),
-                _ => continue,
+                "find" => {
+                    let result = FindArgs::try_parse_from(parts);
+                    let args = match result {
+                        Ok(args) => args,
+                        Err(_error) => {
+                            println!("Please specify valid arguments for find");
+                            continue;
+                        }
+                    };
+                    find(args);
+                }
+                "cd" => cd(&mut current_dir, parts.next(), show_hidden),
+                "ls" => ls(&current_dir, show_hidden),
+                "show" => show_hidden = true,
+                "hide" => show_hidden = false,
+                "-help" => println!(""), // Fill this out
+                "exit" => {
+                    println!("Process terminated");
+                    return;
+                }
+                _ => println!("Please specify a valid command. Use -help for a list of commands"),
             }
         } else {
             continue;
@@ -75,41 +93,48 @@ fn main() {
     }
 }
 
-fn cd(current_dir: PathBuf, arg: Option<&str>) -> PathBuf {
+fn cd(current_dir: &mut PathBuf, arg: Option<&str>, show_hidden: bool) {
     if let Some(directory) = arg {
         if directory.starts_with("C:\\") {
-            return PathBuf::from(directory);
+            *current_dir = PathBuf::from(directory);
+            return;
         } else if directory == ".." {
-            let mut new_dir = current_dir.clone();
-            new_dir.pop();
-            return new_dir;
+            current_dir.pop();
+            return;
         } else {
             if let Ok(entries) = fs::read_dir(&current_dir) {
                 for entry in entries {
                     if let Ok(entry) = entry {
-                        if entry.file_type().unwrap().is_file() {
-                            println!("Cannot cd into a file");
-                        } else if entry.file_type().unwrap().is_dir() {
-                            if entry.file_name() == directory {
-                                return PathBuf::from(entry.path());
+                        if entry.file_name() == directory {
+                            if !show_hidden
+                                && entry.file_name().to_string_lossy().chars().nth(0) == Some('.')
+                            {
+                                continue;
+                            }
+                            if entry.file_type().unwrap().is_file() {
+                                println!("Cannot cd into a file");
+                            } else if entry.file_type().unwrap().is_dir() {
+                                *current_dir = entry.path();
+                                return;
                             }
                         }
                     }
                 }
             } else {
-                panic!("Failed to open {:?}", &current_dir);
+                println!("Failed to open {:?}", &current_dir);
             }
         }
     }
-
-    assert!(false); // Big problems if reaches here.
-    return PathBuf::new();
+    println!("Please specifiy a valid directory to move to")
 }
 
-fn ls(current_dir: &PathBuf) {
+fn ls(current_dir: &PathBuf, show_hidden: bool) {
     if let Ok(entries) = fs::read_dir(&current_dir) {
         for entry in entries {
             if let Ok(entry) = entry {
+                if !show_hidden && entry.file_name().to_string_lossy().chars().nth(0) == Some('.') {
+                    continue;
+                }
                 println!("{}", entry.file_name().to_str().unwrap());
             }
         }
