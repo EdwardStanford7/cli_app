@@ -10,39 +10,39 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 struct FindArgs {
     /// Directories to search through
-    #[arg(short = 'd', long = "dir", required = true)]
+    #[clap(short = 'd', long = "dir")]
     directories: Vec<String>,
 
     /// A regex pattern to search for in the given directories
-    #[arg(short = 'm', long = "match", required = true)]
+    #[clap(short = 'm', long = "match")]
     patterns: Vec<String>,
 
     /// File to write the output to. Default is stdout
-    #[arg(short = 'o', long = "output")]
+    #[clap(short = 'o', long = "output")]
     output_file: Option<String>,
 
     /// Minimum file size in bytes to search for
-    #[arg(short = 's', long = "size")]
+    #[clap(short = 's', long = "size")]
     file_size: Option<u64>,
 
     /// Search for directories matching pattern as well as files
-    #[arg(short = 'a', long = "all")]
+    #[clap(short = 'a', long = "all")]
     all: Option<bool>,
 
     /// Only search for patterns including this special character
-    #[arg(short = 'c', long = "char")]
+    #[clap(short = 'c', long = "char")]
     special_character: Option<char>,
 
     /// How many levels of folders to search
-    #[arg(short = 'l', long = "level")]
+    #[clap(short = 'l', long = "level")]
     nesting_depth: Option<i32>,
 
     /// Specific file type to search for
-    #[arg(short = 't', long = "type")]
+    #[clap(short = 't', long = "type")]
     file_type: Option<String>,
 
     /// Only search directories and files that meet a specific permissions level
-    #[arg(short = 'p', long = "perms")]
+    #[clap(short = 'p', long = "perms")]
     permissions: Option<String>,
 }
 
@@ -58,23 +58,13 @@ fn main() {
 
         input.clear();
         stdin.read_line(&mut input).expect("Failed to read line");
-        input = input.trim().to_string(); // Trim trailing newline characters
-
-        let mut parts = input.split(" ");
+        let mut parts = input.split_whitespace();
         let command = parts.next();
 
         if let Some(first) = command {
             match first {
                 "find" => {
-                    let result = FindArgs::try_parse_from(parts);
-                    let args = match result {
-                        Ok(args) => args,
-                        Err(_error) => {
-                            println!("Please specify valid arguments for find");
-                            continue;
-                        }
-                    };
-                    find(args);
+                    find(&current_dir, FindArgs::parse_from(parts));
                 }
                 "cd" => cd(&mut current_dir, parts.next(), show_hidden),
                 "ls" => ls(&current_dir, show_hidden),
@@ -141,18 +131,26 @@ fn ls(current_dir: &PathBuf, show_hidden: bool) {
     }
 }
 
-fn find(args: FindArgs) {
-    for directory in &args.directories {
-        for pattern in &args.patterns {
-            search_directory(
-                PathBuf::from(directory.clone()),
-                &Regex::new(&pattern).unwrap(),
-            );
+fn find(current_dir: &PathBuf, args: FindArgs) {
+    dbg!(&args);
+    if args.directories.is_empty() {
+        if args.patterns.is_empty() {
+            search_directory(current_dir, &Regex::new(r".*").unwrap())
+        } else {
+            for pattern in &args.patterns {
+                search_directory(current_dir, &Regex::new(&pattern).unwrap());
+            }
+        }
+    } else {
+        for directory in &args.directories {
+            for pattern in &args.patterns {
+                search_directory(&PathBuf::from(directory), &Regex::new(&pattern).unwrap());
+            }
         }
     }
 }
 
-fn search_directory(path: PathBuf, pattern: &Regex) {
+fn search_directory(path: &PathBuf, pattern: &Regex) {
     if let Ok(entries) = fs::read_dir(&path) {
         for entry in entries {
             if let Ok(entry) = entry {
@@ -164,7 +162,7 @@ fn search_directory(path: PathBuf, pattern: &Regex) {
                     if pattern.is_match(entry.path().to_str().unwrap()) {
                         println!("{}", &entry.path().display());
                     }
-                    search_directory(PathBuf::from(entry.path()), &pattern)
+                    search_directory(&PathBuf::from(entry.path()), &pattern)
                 }
             }
         }
