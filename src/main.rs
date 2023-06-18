@@ -7,7 +7,8 @@ use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
+#[command(about, version, no_binary_name(true))]
 struct FindArgs {
     /// Directories to search through
     #[clap(short = 'd', long = "dir")]
@@ -64,7 +65,15 @@ fn main() {
         if let Some(first) = command {
             match first {
                 "find" => {
-                    find(&current_dir, FindArgs::parse_from(parts));
+                    let result = FindArgs::try_parse_from(parts);
+                    let args = match result {
+                        Ok(args) => args,
+                        Err(_error) => {
+                            println!("Please specify valid arguments for find");
+                            continue;
+                        }
+                    };
+                    find(&current_dir, args);
                 }
                 "cd" => cd(&mut current_dir, parts.next(), show_hidden),
                 "ls" => ls(&current_dir, show_hidden),
@@ -132,7 +141,6 @@ fn ls(current_dir: &PathBuf, show_hidden: bool) {
 }
 
 fn find(current_dir: &PathBuf, args: FindArgs) {
-    dbg!(&args);
     if args.directories.is_empty() {
         if args.patterns.is_empty() {
             search_directory(current_dir, &Regex::new(r".*").unwrap())
@@ -143,8 +151,12 @@ fn find(current_dir: &PathBuf, args: FindArgs) {
         }
     } else {
         for directory in &args.directories {
-            for pattern in &args.patterns {
-                search_directory(&PathBuf::from(directory), &Regex::new(&pattern).unwrap());
+            if args.patterns.is_empty() {
+                search_directory(&PathBuf::from(directory), &Regex::new(r".*").unwrap())
+            } else {
+                for pattern in &args.patterns {
+                    search_directory(&PathBuf::from(directory), &Regex::new(&pattern).unwrap());
+                }
             }
         }
     }
