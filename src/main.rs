@@ -8,39 +8,31 @@ use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, Default)]
-#[command(about, version, no_binary_name(true))]
+#[command(no_binary_name(true))]
 struct FindArgs {
-    /// Directories to search through
+    /// Directories to search through, default will search current directory.
     #[clap(short = 'd', long = "dir")]
     directories: Vec<String>,
 
-    /// A regex pattern to search for in the given directories
+    /// A regex pattern to search for in the given directories, default will match all files.
     #[clap(short = 'm', long = "match")]
     patterns: Vec<String>,
 
-    /// File to write the output to. Default is stdout
+    /// File to write the output to, default is stdout.
     #[clap(short = 'o', long = "output")]
     output_file: Option<String>,
 
-    /// Minimum file size in bytes to search for
+    /// Minimum file size in bytes to search for, default is 0.
     #[clap(short = 's', long = "size")]
     file_size: Option<u64>,
 
-    /// Search for directories matching pattern as well as files
+    /// Search for directories as well as files.
     #[clap(short = 'a', long = "all")]
     all: Option<bool>,
 
-    /// Only search for patterns including this special character
-    #[clap(short = 'c', long = "char")]
-    special_character: Option<char>,
-
-    /// How many levels of folders to search
+    /// How many levels of folders to search.
     #[clap(short = 'l', long = "level")]
     nesting_depth: Option<i32>,
-
-    /// Specific file type to search for
-    #[clap(short = 't', long = "type")]
-    file_type: Option<String>,
 
     /// Only search directories and files that meet a specific permissions level
     #[clap(short = 'p', long = "perms")]
@@ -65,6 +57,19 @@ fn main() {
         if let Some(first) = command {
             match first {
                 "find" => {
+                    if parts.next() == Some("-help") {
+                        println!("Available flags for find:");
+                        println!("\t-d, --dir <directories>: Directories to search through, default will search current directory");
+                        println!("\t-m, --match <patterns>: A regex pattern to search for in the given directories, default will match all files");
+                        println!("\t-o, --output <output_file>: File to write the output to, default is stdout");
+                        println!("\t-s, --size <file_size>: Minimum file size in bytes to search for, default is 0");
+                        println!("\t-a, --all: Search for directories as well as files");
+                        println!(
+                            "\t-l, --level <folder_level>: How many levels of folders to search"
+                        );
+                        println!("\t-p, --perms <permissions>: Only search directories and files that meet a specific permissions level");
+                        continue;
+                    }
                     let result = FindArgs::try_parse_from(parts);
                     let args = match result {
                         Ok(args) => args,
@@ -79,7 +84,17 @@ fn main() {
                 "ls" => ls(&current_dir, show_hidden),
                 "show" => show_hidden = true,
                 "hide" => show_hidden = false,
-                "-help" => println!(""), // Fill this out
+                "help" => {
+                    println!("Available commands:");
+                    println!("\tfind <file/directory>: Search for a file or directory \n\t\t use find -help for more details");
+                    println!("\tcd <directory>: Change the current directory");
+                    println!("\tls: List files and directories in the current directory");
+                    println!("\tshow: Show hidden files and directories");
+                    println!("\thide: Hide hidden files and directories");
+                    println!("\thelp: Show this help menu");
+                    println!("\texit: Terminate the process");
+                }
+
                 "exit" => {
                     println!("Process terminated");
                     return;
